@@ -2,8 +2,11 @@ name: Update Google Fonts Map
 
 on:
   schedule:
-    - cron: '30 17 15 * *'  
-  workflow_dispatch:      
+    - cron: '0 19 15 * *'  
+  workflow_dispatch: 
+  
+permissions:
+  contents: write
 
 jobs:
   update-fonts:
@@ -29,7 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="fonts-${{ steps.date.outputs.date }}"
+          tag="gfonts-${{ steps.date.outputs.date }}"
           gh release create "$tag" gFontLibrary.js \
             --title "GFont Library - ${{ steps.date.outputs.date }}" \
             --notes "Automated release of gFontLibrary.js on ${{ steps.date.outputs.date }}" \
