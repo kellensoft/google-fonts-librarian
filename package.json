@@ -12,7 +12,6 @@
   },
   "license": "MIT",
   "author": "me",
-  "type": "module",
   "scripts": {
     "generate-map": "node generate-map.js"
   },
