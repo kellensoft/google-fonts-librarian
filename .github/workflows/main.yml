@@ -2,7 +2,7 @@ name: Update Google Fonts Map
 
 on:
   schedule:
-    - cron: '0 17 15 * *'  
+    - cron: '30 17 15 * *'  
   workflow_dispatch:      
 
 jobs:
