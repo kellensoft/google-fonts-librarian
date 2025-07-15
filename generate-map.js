@@ -1,10 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const slugify = require('slugify');
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import slugify from 'slugify';
 
 const API_KEY = process.env.GOOGLE_FONTS_API_KEY;
-const OUTPUT_FILE = path.join(__dirname, '../gFontLibrary.js');
+const OUTPUT_FILE = path.resolve('gFontLibrary.js');
 
 async function generateFontLibrary() {
   try {
