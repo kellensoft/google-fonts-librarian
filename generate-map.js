@@ -15,10 +15,12 @@ async function generateFontLibrary() {
     const fonts = {};
 
     for (const font of data.items) {
+      const name = font.family;
       const key = slugify(font.family, { lower: true });
       fonts[key] = {
+        name,
         importUrl: `https://fonts.googleapis.com/css2?family=${font.family.replace(/ /g, '+')}&display=swap`,
-        cssFamily: `'${font.family}', ${font.category}`,
+        cssFamily: `'${name}', ${font.category}`,
       };
     }
 
