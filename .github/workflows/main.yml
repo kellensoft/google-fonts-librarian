@@ -2,8 +2,8 @@ name: Update Google Fonts Map
 
 on:
   schedule:
-    - cron: '0 17 * * *'  # Runs daily at 5pm UTC
-  workflow_dispatch:      # Allows manual runs from GitHub UI
+    - cron: '0 17 15 * *'  
+  workflow_dispatch:      
 
 jobs:
   update-fonts:
@@ -21,10 +21,16 @@ jobs:
         env:
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
 
-      - name: Commit and push if changed
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add gFontLibrary.js
-          git diff --cached --quiet || git commit -m "Update font library"
-          git push
+          tag="fonts-${{ steps.date.outputs.date }}"
+          gh release create "$tag" gFontLibrary.js \
+            --title "GFont Library - ${{ steps.date.outputs.date }}" \
+            --notes "Automated release of gFontLibrary.js on ${{ steps.date.outputs.date }}" \
+            --repo ${{ github.repository }}
