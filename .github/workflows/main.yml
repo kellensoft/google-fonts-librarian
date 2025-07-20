@@ -2,7 +2,7 @@ name: Update Google Fonts Map
 
 on:
   schedule:
-    - cron: '0 19 15 * *'  
+    - cron: '0 0 21 * *'
   workflow_dispatch: 
   
 permissions:
@@ -20,9 +20,11 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run generate-map
+      - run: node scripts/generate-map.js
         env:
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
+
+      - run: node scripts/measure-scale.js
 
       - name: Get current date
         id: date
@@ -33,7 +35,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="gfonts-${{ steps.date.outputs.date }}"
-          gh release create "$tag" gFontLibrary.js \
+          gh release create "$tag" google-fonts.json \
             --title "GFont Library - ${{ steps.date.outputs.date }}" \
-            --notes "Automated release of gFontLibrary.js on ${{ steps.date.outputs.date }}" \
+            --notes "Automated release of google-fonts.json on ${{ steps.date.outputs.date }}" \
             --repo ${{ github.repository }}
