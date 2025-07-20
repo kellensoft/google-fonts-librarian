@@ -20,11 +20,11 @@ jobs:
 
       - run: npm ci
 
-      - run: node scripts/generate-map.js
+      - run: node generate-map.js
         env:
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
 
-      - run: node scripts/measure-scale.js
+      - run: node measure-scale.js
 
       - name: Get current date
         id: date
