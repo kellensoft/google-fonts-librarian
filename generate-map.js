@@ -4,7 +4,7 @@ import axios from 'axios';
 import slugify from 'slugify';
 
 const API_KEY = process.env.GOOGLE_FONTS_API_KEY;
-const OUTPUT_FILE = path.resolve('gFontLibrary.js');
+const OUTPUT_FILE = path.resolve('fonts.json');
 
 async function generateFontLibrary() {
   try {
@@ -24,8 +24,7 @@ async function generateFontLibrary() {
       };
     }
 
-    const exportString = `export const gFontLibrary = ${JSON.stringify(fonts, null, 2)};\n`;
-    fs.writeFileSync(OUTPUT_FILE, exportString);
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(fonts, null, 2));
     console.log('✅ Font library updated.');
   } catch (err) {
     console.error('❌ Error generating font library:', err);
