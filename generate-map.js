@@ -12,7 +12,7 @@ function fetchStatusCode(url) {
 
 async function getWorkingImportUrl(fontName) {
   const encoded = encodeURIComponent(fontName);
-  const css2Wght = `https://fonts.googleapis.com/css2?family=${encoded}:wght@400&display=swap`;
+  const css2Wght = `https://fonts.googleapis.com/css2?family=${encoded}:wght@300&display=swap`;
   const css2 = `https://fonts.googleapis.com/css2?family=${encoded}&display=swap`;
   const css = `https://fonts.googleapis.com/css?family=${encoded}&display=swap`;
 
