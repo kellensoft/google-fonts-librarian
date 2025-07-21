@@ -5,10 +5,11 @@ import path from 'path';
 const INPUT_FILE = path.resolve('fonts.json');
 const OUTPUT_FILE = path.resolve('google-fonts.json');
 
-const BASE_FONT = 'Roboto';
-const BASE_URL = 'https://fonts.googleapis.com/css2?family=Roboto&display=swap';
+const BASE_FONT = 'Roboto Mono';
+const BASE_URL = 'https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap';
 
-const TEST_STRING = 'WWWWWwwwww';
+const WIDTH_TEST_STRING = 'MMMMMWWWWW';
+const HEIGHT_TEST_STRING = 'HhgjpqyAQ';
 const TEST_SIZE = 100;
 
 const BATCH_SIZE = 20;
@@ -39,8 +40,10 @@ async function retryFailedFont(page, key, font, attempt = 1) {
       </style>
     </head>
     <body>
-      <div class="test base" id="base">${TEST_STRING}</div>
-      <div class="test target" id="target">${TEST_STRING}</div>
+      <div class="test base" id="base-width">${WIDTH_TEST_STRING}</div>
+      <div class="test target" id="target-width">${WIDTH_TEST_STRING}</div>
+      <div class="test base" id="base-height">${HEIGHT_TEST_STRING}</div>
+      <div class="test target" id="target-height">${HEIGHT_TEST_STRING}</div>
     </body>
     </html>
   `;
@@ -49,7 +52,9 @@ async function retryFailedFont(page, key, font, attempt = 1) {
   
   await page.evaluate(async (fontName, testSize) => {
     await document.fonts.ready;
+    
     await document.fonts.load(`400 ${testSize}px "${fontName}"`);
+    
     let attempts = 0;
     while (!document.fonts.check(`400 ${testSize}px "${fontName}"`) && attempts < 30) {
       await new Promise(r => setTimeout(r, 100));
@@ -60,17 +65,23 @@ async function retryFailedFont(page, key, font, attempt = 1) {
   await new Promise(resolve => setTimeout(resolve, 200));
 
   const measurement = await page.evaluate(() => {
-    const baseRect = document.getElementById('base').getBoundingClientRect();
-    const targetRect = document.getElementById('target').getBoundingClientRect();
+    const baseWidthRect = document.getElementById('base-width').getBoundingClientRect();
+    const targetWidthRect = document.getElementById('target-width').getBoundingClientRect();
+    const baseHeightRect = document.getElementById('base-height').getBoundingClientRect();
+    const targetHeightRect = document.getElementById('target-height').getBoundingClientRect();
     
     return {
-      baseWidth: baseRect.width,
-      targetWidth: targetRect.width,
-      scale: baseRect.width / targetRect.width
+      baseWidth: baseWidthRect.width,
+      targetWidth: targetWidthRect.width,
+      baseHeight: baseHeightRect.height,
+      targetHeight: targetHeightRect.height,
+      widthScale: baseWidthRect.width / targetWidthRect.width,
+      heightScale: baseHeightRect.height / targetHeightRect.height
     };
   });
 
-  if (Math.abs(measurement.baseWidth - measurement.targetWidth) < 0.1) {
+  if (Math.abs(measurement.baseWidth - measurement.targetWidth) < 0.1 && 
+      Math.abs(measurement.baseHeight - measurement.targetHeight) < 0.1) {
     return null;
   }
 
@@ -108,8 +119,12 @@ async function measureFontBatch(page, fontBatch) {
       </style>
     </head>
     <body>
-      <div class="test base" id="base">${TEST_STRING}</div>
-      ${fontBatch.map(([key]) => `<div class="test font-${key}" id="target-${key}">${TEST_STRING}</div>`).join('')}
+      <div class="test base" id="base-width">${WIDTH_TEST_STRING}</div>
+      <div class="test base" id="base-height">${HEIGHT_TEST_STRING}</div>
+      ${fontBatch.map(([key]) => `
+        <div class="test font-${key}" id="target-width-${key}">${WIDTH_TEST_STRING}</div>
+        <div class="test font-${key}" id="target-height-${key}">${HEIGHT_TEST_STRING}</div>
+      `).join('')}
     </body>
     </html>
   `;
@@ -119,6 +134,7 @@ async function measureFontBatch(page, fontBatch) {
   const fontNames = fontBatch.map(([key, font]) => font.name);
   const loadResults = await page.evaluate(async (fontNames) => {
     await document.fonts.ready;
+    
     const results = {};
     const promises = fontNames.map(async (fontName) => {
       let attempts = 0;
@@ -128,21 +144,29 @@ async function measureFontBatch(page, fontBatch) {
       }
       results[fontName] = attempts < 20;
     });
+    
     await Promise.all(promises);
     return results;
   }, fontNames);
 
   const measurements = await page.evaluate((fontKeys) => {
-    const baseRect = document.getElementById('base').getBoundingClientRect();
+    const baseWidthRect = document.getElementById('base-width').getBoundingClientRect();
+    const baseHeightRect = document.getElementById('base-height').getBoundingClientRect();
     const results = {};
+    
     fontKeys.forEach(key => {
-      const targetRect = document.getElementById(`target-${key}`).getBoundingClientRect();
+      const targetWidthRect = document.getElementById(`target-width-${key}`).getBoundingClientRect();
+      const targetHeightRect = document.getElementById(`target-height-${key}`).getBoundingClientRect();
       results[key] = {
-        baseWidth: baseRect.width,
-        targetWidth: targetRect.width,
-        scale: baseRect.width / targetRect.width
+        baseWidth: baseWidthRect.width,
+        targetWidth: targetWidthRect.width,
+        baseHeight: baseHeightRect.height,
+        targetHeight: targetHeightRect.height,
+        widthScale: baseWidthRect.width / targetWidthRect.width,
+        heightScale: baseHeightRect.height / targetHeightRect.height
       };
     });
+    
     return results;
   }, fontBatch.map(([key]) => key));
 
@@ -151,8 +175,10 @@ async function measureFontBatch(page, fontBatch) {
     if (!loadResults[font.name]) {
       console.warn(`⚠️ Font loading timeout: ${key}`);
     }
+    
     const measurement = measurements[key];
-    if (Math.abs(measurement.baseWidth - measurement.targetWidth) < 0.1) {
+    if (Math.abs(measurement.baseWidth - measurement.targetWidth) < 0.1 ||
+        Math.abs(measurement.baseHeight - measurement.targetHeight) < 0.1) {
       failedFonts.push([key, font]);
     }
   });
@@ -182,6 +208,7 @@ async function measureFontBatch(page, fontBatch) {
 
   try {
     const page = await browser.newPage();
+    
     await page.setViewport({ width: 1200, height: 800 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
     
@@ -191,72 +218,65 @@ async function measureFontBatch(page, fontBatch) {
       const totalBatches = Math.ceil(fontEntries.length / BATCH_SIZE);
       
       console.log(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} fonts)`);
-
-      // Set scale=1 for Roboto fonts and skip measuring and retrying
-      batch.forEach(([key, font]) => {
-        if (font.name === 'Roboto') {
-          font.scale = 1.0;
-          results[key] = font;
-        }
-      });
-
-      const filteredBatch = batch.filter(([key, font]) => font.name !== 'Roboto');
-
+      
       try {
-        if (filteredBatch.length > 0) {
-          const { measurements, failedFonts } = await measureFontBatch(page, filteredBatch);
-          filteredBatch.forEach(([key, font]) => {
-            if (!font.cssFamily) {
-              font.cssFamily = `'${font.name}'`;
-            }
-            font.scale = parseFloat(measurements[key].scale.toFixed(3));
-            results[key] = font;
-          });
-
-          if (failedFonts.length > 0) {
-            console.log(`🔄 Retrying ${failedFonts.length} fonts from batch ${batchNumber}`);
+        const { measurements, failedFonts } = await measureFontBatch(page, batch);
+        
+        batch.forEach(([key, font]) => {
+          if (!font.cssFamily) {
+            font.cssFamily = `'${font.name}'`;
+          }
+          
+          font.widthScale = parseFloat(measurements[key].widthScale.toFixed(3));
+          font.heightScale = parseFloat(measurements[key].heightScale.toFixed(3));
+          font.scale = font.widthScale;
+          results[key] = font;
+        });
+        
+        if (failedFonts.length > 0) {
+          console.log(`🔄 Retrying ${failedFonts.length} fonts from batch ${batchNumber}`);
+          
+          for (const [key, font] of failedFonts) {
+            let retrySuccessful = false;
             
-            for (const [key, font] of failedFonts) {
-              if (font.name === 'Roboto') {
-                font.scale = 1.0;
-                results[key] = font;
-                continue;
-              }
-              let retrySuccessful = false;
-              
-              for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                try {
-                  const retryMeasurement = await retryFailedFont(page, key, font, attempt);
-                  if (retryMeasurement) {
-                    font.scale = parseFloat(retryMeasurement.scale.toFixed(3));
-                    results[key] = font;
-                    retrySuccessful = true;
-                    break;
-                  }
-                } catch (retryError) {
-                  console.warn(`⚠️ Retry attempt ${attempt} failed for ${key}: ${retryError.message}`);
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              try {
+                const retryMeasurement = await retryFailedFont(page, key, font, attempt);
+                
+                if (retryMeasurement) {
+                  font.widthScale = parseFloat(retryMeasurement.widthScale.toFixed(3));
+                  font.heightScale = parseFloat(retryMeasurement.heightScale.toFixed(3));
+                  font.scale = font.widthScale;
+                  results[key] = font;
+                  retrySuccessful = true;
+                  break;
                 }
-                if (attempt < MAX_RETRIES) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                }
+              } catch (retryError) {
+                console.warn(`⚠️ Retry attempt ${attempt} failed for ${key}: ${retryError.message}`);
               }
               
-              if (!retrySuccessful) {
-                console.warn(`❌ Font ${key} failed after ${MAX_RETRIES} retries - using fallback scale`);
-                font.scale = 1.0;
-                results[key] = font;
+              if (attempt < MAX_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, 500));
               }
+            }
+            
+            if (!retrySuccessful) {
+              console.warn(`❌ Font ${key} failed after ${MAX_RETRIES} retries - using fallback scales`);
+              font.widthScale = 1.0;
+              font.heightScale = 1.0;
+              font.scale = 1.0;
+              results[key] = font;
             }
           }
         }
+        
       } catch (error) {
         console.error(`❌ Error processing batch ${batchNumber}: ${error.message}`);
+        
         batch.forEach(([key, font]) => {
-          if (font.name === 'Roboto') {
-            font.scale = 1.0;
-          } else {
-            font.scale = 1.0;
-          }
+          font.widthScale = 1.0;
+          font.heightScale = 1.0;
+          font.scale = 1.0;
           results[key] = font;
         });
       }
