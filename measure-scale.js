@@ -50,12 +50,12 @@ async function measureFont(page, font) {
     const base = document.querySelector('.base').getBoundingClientRect();
     const target = document.querySelector('.target').getBoundingClientRect();
     return {
-      baseHeight: base.height,
-      targetHeight: target.height,
+      baseWidth: base.width,
+      targetWidth: target.width,
     };
   });
 
-  return rects.baseHeight / rects.targetHeight;
+  return rects.baseWidth / rects.targetWidth;
 }
 
 (async () => {
