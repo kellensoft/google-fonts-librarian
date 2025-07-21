@@ -2,6 +2,28 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import slugify from 'slugify';
+import https from 'https';
+
+function fetchStatusCode(url) {
+  return new Promise((resolve) => {
+    https.get(url, (res) => resolve(res.statusCode)).on('error', () => resolve(null));
+  });
+}
+
+async function getWorkingImportUrl(fontName) {
+  const encoded = encodeURIComponent(fontName);
+  const css2 = `https://fonts.googleapis.com/css2?family=${encoded}&display=swap`;
+  const css = `https://fonts.googleapis.com/css?family=${encoded}&display=swap`;
+
+  const css2Status = await fetchStatusCode(css2);
+  if (css2Status === 200) return css2;
+
+  const cssStatus = await fetchStatusCode(css);
+  if (cssStatus === 200) return css;
+
+  console.warn(`❌ No working import URL for "${fontName}"`);
+  return null;
+}
 
 const API_KEY = process.env.GOOGLE_FONTS_API_KEY;
 const OUTPUT_FILE = path.resolve('fonts.json');
@@ -17,9 +39,12 @@ async function generateFontLibrary() {
     for (const font of data.items) {
       const name = font.family;
       const key = slugify(font.family, { lower: true });
+      const importUrl = await getWorkingImportUrl(name);
+      if (!importUrl) continue;
+
       fonts[key] = {
         name,
-        importUrl: `https://fonts.googleapis.com/css2?family=${font.family.replace(/ /g, '+')}&display=swap`,
+        importUrl,
         cssFamily: `'${name}', ${font.category}`,
       };
     }
