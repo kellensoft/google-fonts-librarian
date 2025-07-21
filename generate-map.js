@@ -2,31 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import slugify from 'slugify';
-import https from 'https';
 
-function fetchStatusCode(url) {
-  return new Promise((resolve) => {
-    https.get(url, (res) => resolve(res.statusCode)).on('error', () => resolve(null));
-  });
-}
+function getWorkingImportUrl(font) {
+  const name = font.family;
+  const encoded = name.replace(/ /g, '+');
+  const weightVariants = font.variants.filter(v => /^\d+$/.test(v));
 
-async function getWorkingImportUrl(fontName) {
-  const encoded = encodeURIComponent(fontName);
-  const css2Wght = `https://fonts.googleapis.com/css2?family=${encoded}:wght@300&display=swap`;
-  const css2 = `https://fonts.googleapis.com/css2?family=${encoded}&display=swap`;
-  const css = `https://fonts.googleapis.com/css?family=${encoded}&display=swap`;
+  if (font.variants.length === 1 && font.variants[0] === 'italic') {
+    return `https://fonts.googleapis.com/css2?family=${encoded}:ital@1&display=swap`;
+  }
 
-  const css2WghtStatus = await fetchStatusCode(css2Wght);
-  if (css2WghtStatus === 200) return css2Wght;
+  if (weightVariants.length > 0) {
+    const minWeight = Math.min(...weightVariants.map(Number));
+    return `https://fonts.googleapis.com/css2?family=${encoded}:wght@${minWeight}&display=swap`;
+  }
 
-  const css2Status = await fetchStatusCode(css2);
-  if (css2Status === 200) return css2;
-
-  const cssStatus = await fetchStatusCode(css);
-  if (cssStatus === 200) return css;
-
-  console.warn(`❌ No working import URL for "${fontName}"`);
-  return null;
+  return `https://fonts.googleapis.com/css2?family=${encoded}&display=swap`;
 }
 
 const API_KEY = process.env.GOOGLE_FONTS_API_KEY;
@@ -43,7 +34,7 @@ async function generateFontLibrary() {
     for (const font of data.items) {
       const name = font.family;
       const key = slugify(font.family, { lower: true });
-      const importUrl = await getWorkingImportUrl(name);
+      const importUrl = await getWorkingImportUrl(font);
       if (!importUrl) continue;
 
       fonts[key] = {
