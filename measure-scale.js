@@ -8,7 +8,7 @@ const OUTPUT_FILE = path.resolve('google-fonts.json');
 const BASE_FONT = 'Roboto Mono';
 const BASE_URL = 'https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap';
 
-const TEST_STRING = 'WWWWWwwwww';
+const TEST_STRING = 'HhWwXxOo123';
 const TEST_SIZE = 100;
 
 const BATCH_SIZE = 20;
