@@ -13,33 +13,55 @@ const CONFIG = {
 };
 
 const CHARACTER_RANGES = [
-  [0x0020, 0x007F],
-  [0x00A0, 0x00FF],
+  [0x0021, 0x007E],
+  [0x00A1, 0x00FF],
   [0x0100, 0x017F],
   [0x0180, 0x024F],
   [0x1E00, 0x1EFF],
-  [0x2000, 0x206F],
+  [0x2010, 0x2027],
+  [0x2030, 0x205F],
   [0x20A0, 0x20CF],
   [0x2100, 0x214F],
   [0x2190, 0x21FF],
   [0x2200, 0x22FF],
 ];
 
-function generateCharacters() {
-  const characters = [];
+function generateCharacterMappings() {
+  const characterMap = new Map();
+  
   for (const [start, end] of CHARACTER_RANGES) {
-    for (let i = start; i <= end; i++) {
-      const char = String.fromCharCode(i);
-      if (/\P{Cc}/u.test(char) && /\P{Cn}/u.test(char)) {
-        characters.push(char);
+    for (let codePoint = start; codePoint <= end; codePoint++) {
+      const char = String.fromCharCode(codePoint);
+      
+      if (isVisibleCharacter(char)) {
+        const key = `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
+        characterMap.set(key, char);
       }
     }
   }
-  return characters;
+  
+  return characterMap;
 }
 
-const CHARACTERS = generateCharacters();
-console.log(`📊 Testing ${CHARACTERS.length} characters`);
+function isVisibleCharacter(char) {
+  if (/\s/.test(char) && char !== ' ') return false;
+  
+  if (/\p{Cc}/u.test(char)) return false;
+  
+  if (/\p{Cn}/u.test(char)) return false;
+  
+  if (/\p{Cf}/u.test(char)) return false;
+  
+  if (/\p{Co}/u.test(char)) return false;
+  
+  if (/\p{Cs}/u.test(char)) return false;
+  
+  return true;
+}
+
+const CHARACTER_MAP = generateCharacterMappings();
+const CHARACTERS_ARRAY = Array.from(CHARACTER_MAP.values());
+console.log(`📊 Testing ${CHARACTER_MAP.size} visible characters`);
 
 function validateInput() {
   if (!fs.existsSync(CONFIG.INPUT_FILE)) {
@@ -70,10 +92,6 @@ function validateInput() {
 }
 
 function getFontHtml(font, characters) {
-  const safeChars = characters
-    .map(c => c.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&/g, '&amp;'))
-    .join('');
-  
   return `
     <!DOCTYPE html>
     <html>
@@ -158,9 +176,14 @@ async function measureCharactersInBatches(page, font, characters) {
           )
         ]);
         
-        const batchResults = await page.evaluate((chars) => {
+        const batchResults = await page.evaluate((chars, characterMap) => {
           const container = document.getElementById('container');
           const results = {};
+          
+          const charToKeyMap = {};
+          for (const [key, char] of Object.entries(characterMap)) {
+            charToKeyMap[char] = key;
+          }
           
           for (const char of chars) {
             try {
@@ -171,7 +194,10 @@ async function measureCharactersInBatches(page, font, characters) {
               
               const rect = el.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
-                results[char] = Math.round(rect.width * 100) / 100;
+                const unicodeKey = charToKeyMap[char];
+                if (unicodeKey) {
+                  results[unicodeKey] = Math.round(rect.width * 100) / 100;
+                }
               }
               
               container.removeChild(el);
@@ -181,7 +207,7 @@ async function measureCharactersInBatches(page, font, characters) {
           }
           
           return results;
-        }, batch);
+        }, batch, Object.fromEntries(CHARACTER_MAP));
         
         Object.assign(results, batchResults);
         break;
@@ -210,11 +236,11 @@ async function processFont(page, key, font) {
     console.log(`  📝 CSS Family: ${font.cssFamily}`);
     
     const startTime = Date.now();
-    const charMetrics = await measureCharactersInBatches(page, font, CHARACTERS);
+    const charMetrics = await measureCharactersInBatches(page, font, CHARACTERS_ARRAY);
     const endTime = Date.now();
     
     const measuredCount = Object.keys(charMetrics).length;
-    console.log(`  ✅ Measured ${measuredCount}/${CHARACTERS.length} characters in ${endTime - startTime}ms`);
+    console.log(`  ✅ Measured ${measuredCount}/${CHARACTER_MAP.size} characters in ${endTime - startTime}ms`);
     
     font.characters = charMetrics;
     font.characterCount = measuredCount;
