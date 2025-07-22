@@ -1,2 +1,2 @@
 # google-fonts-librarian
-Map the GFont CDN library
+Map the Google Fonts CDN library
