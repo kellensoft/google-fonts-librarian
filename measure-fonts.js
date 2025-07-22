@@ -234,26 +234,19 @@ async function processFont(page, key, font) {
     console.log(`📐 Measuring characters for "${key}"`);
     console.log(`  🔗 Font URL: ${font.importUrl}`);
     console.log(`  📝 CSS Family: ${font.cssFamily}`);
-    
+
     const startTime = Date.now();
     const charMetrics = await measureCharactersInBatches(page, font, CHARACTERS_ARRAY);
     const endTime = Date.now();
-    
+
     const measuredCount = Object.keys(charMetrics).length;
     console.log(`  ✅ Measured ${measuredCount}/${CHARACTER_MAP.size} characters in ${endTime - startTime}ms`);
-    
+
     font.characters = charMetrics;
-    font.characterCount = measuredCount;
-    font.lastMeasured = new Date().toISOString();
-    delete font.scale;
-    
+
     return true;
   } catch (error) {
     console.error(`  ❌ Failed to measure "${key}": ${error.message}`);
-    
-    font.measurementError = error.message;
-    font.lastMeasured = new Date().toISOString();
-    
     return false;
   }
 }
