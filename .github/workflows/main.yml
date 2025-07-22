@@ -2,7 +2,7 @@ name: Update Google Fonts Map
 
 on:
   schedule:
-    - cron: '0 0 21 * *'
+    - cron: '30 14 21 * *'
   workflow_dispatch: 
   
 permissions:
@@ -24,7 +24,7 @@ jobs:
         env:
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
 
-      - run: node measure-scale.js
+      - run: node measure-fonts.js
 
       - name: Get current date
         id: date
