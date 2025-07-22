@@ -171,10 +171,7 @@ async function measureCharactersInBatches(page, font, characters) {
               
               const rect = el.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
-                results[char] = { 
-                  width: Math.round(rect.width * 100) / 100, 
-                  height: Math.round(rect.height * 100) / 100 
-                };
+                results[char] = Math.round(rect.width * 100) / 100;
               }
               
               container.removeChild(el);
