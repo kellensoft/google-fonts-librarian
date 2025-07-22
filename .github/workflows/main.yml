@@ -36,6 +36,6 @@ jobs:
         run: |
           tag="gfonts-${{ steps.date.outputs.date }}"
           gh release create "$tag" google-fonts.json \
-            --title "GFont Library - ${{ steps.date.outputs.date }}" \
+            --title "Google Font Library - ${{ steps.date.outputs.date }}" \
             --notes "Automated release of google-fonts.json on ${{ steps.date.outputs.date }}" \
             --repo ${{ github.repository }}
