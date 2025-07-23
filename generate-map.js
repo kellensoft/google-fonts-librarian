@@ -44,7 +44,7 @@ async function generateFontLibrary() {
       };
     }
 
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(fonts, null, 2));
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(google-fonts, null, 2));
   } catch (err) {
     process.exit(1);
   }
