@@ -21,7 +21,7 @@ function getWorkingImportUrl(font) {
 }
 
 const API_KEY = process.env.GOOGLE_FONTS_API_KEY;
-const OUTPUT_FILE = path.resolve('fonts.json');
+const OUTPUT_FILE = path.resolve('google-fonts.json');
 
 async function generateFontLibrary() {
   try {
@@ -44,7 +44,7 @@ async function generateFontLibrary() {
       };
     }
 
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(google-fonts, null, 2));
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(fonts, null, 2));
   } catch (err) {
     process.exit(1);
   }
