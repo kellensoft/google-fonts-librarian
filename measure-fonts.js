@@ -305,18 +305,6 @@ function writeFontFile(fontKey, fontData) {
       await page.goto('about:blank');
     }
     
-    const indexData = {
-      timestamp: new Date().toISOString(),
-      totalFonts: fontEntries.length,
-      successCount,
-      failureCount,
-      outputDirectory: CONFIG.OUTPUT_DIR,
-      files: processedFiles.sort()
-    };
-    
-    const indexPath = path.join(CONFIG.OUTPUT_DIR, 'index.json');
-    fs.writeFileSync(indexPath, JSON.stringify(indexData, null, 2));
-    
   } catch (error) {
     process.exit(1);
   } finally {
