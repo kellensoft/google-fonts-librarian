@@ -4,7 +4,7 @@ import path from 'path';
 
 const CONFIG = {
   INPUT_FILE: path.resolve('fonts.json'),
-  OUTPUT_FILE: path.resolve('google-fonts.json'),
+  OUTPUT_DIR: path.resolve('google-fonts'),
   TEST_SIZE: 100,
   BATCH_SIZE: 500,
   FONT_LOAD_TIMEOUT: 10000,
@@ -32,7 +32,6 @@ function generateCharacterMappings() {
   for (const [start, end] of CHARACTER_RANGES) {
     for (let codePoint = start; codePoint <= end; codePoint++) {
       const char = String.fromCharCode(codePoint);
-      
       if (isVisibleCharacter(char)) {
         const key = `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
         characterMap.set(key, char);
@@ -45,23 +44,16 @@ function generateCharacterMappings() {
 
 function isVisibleCharacter(char) {
   if (/\s/.test(char) && char !== ' ') return false;
-  
   if (/\p{Cc}/u.test(char)) return false;
-  
   if (/\p{Cn}/u.test(char)) return false;
-  
   if (/\p{Cf}/u.test(char)) return false;
-  
   if (/\p{Co}/u.test(char)) return false;
-  
   if (/\p{Cs}/u.test(char)) return false;
-  
   return true;
 }
 
 const CHARACTER_MAP = generateCharacterMappings();
 const CHARACTERS_ARRAY = Array.from(CHARACTER_MAP.values());
-console.log(`📊 Testing ${CHARACTER_MAP.size} visible characters`);
 
 function validateInput() {
   if (!fs.existsSync(CONFIG.INPUT_FILE)) {
@@ -140,16 +132,12 @@ async function measureCharactersInBatches(page, font, characters) {
     batches.push(characters.slice(i, i + CONFIG.BATCH_SIZE));
   }
   
-  console.log(`  📦 Processing ${batches.length} batches`);
-  
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex];
     let retries = 0;
     
     while (retries < CONFIG.MAX_RETRIES) {
       try {
-        console.log(`  🔄 Batch ${batchIndex + 1}/${batches.length} (attempt ${retries + 1})`);
-        
         await page.setContent(getFontHtml(font, batch), { 
           waitUntil: 'domcontentloaded',
           timeout: CONFIG.PAGE_TIMEOUT 
@@ -160,15 +148,11 @@ async function measureCharactersInBatches(page, font, characters) {
             while (!window.measureReady) {
               await new Promise(resolve => setTimeout(resolve, 10));
             }
-            
             await document.fonts.ready;
-            
             try {
               await document.fonts.load(`${size}px "${fontFamily}"`);
             } catch (e) {
-              console.warn('Font load warning:', e.message);
             }
-            
             return true;
           }, font.cssFamily, CONFIG.TEST_SIZE),
           new Promise((_, reject) => 
@@ -179,19 +163,16 @@ async function measureCharactersInBatches(page, font, characters) {
         const batchResults = await page.evaluate((chars, characterMap) => {
           const container = document.getElementById('container');
           const results = {};
-          
           const charToKeyMap = {};
           for (const [key, char] of Object.entries(characterMap)) {
             charToKeyMap[char] = key;
           }
-          
           for (const char of chars) {
             try {
               const el = document.createElement('div');
               el.className = 'char';
               el.textContent = char;
               container.appendChild(el);
-              
               const rect = el.getBoundingClientRect();
               if (rect.width > 0 && rect.height > 0) {
                 const unicodeKey = charToKeyMap[char];
@@ -199,13 +180,10 @@ async function measureCharactersInBatches(page, font, characters) {
                   results[unicodeKey] = Math.round(rect.width * 100) / 100;
                 }
               }
-              
               container.removeChild(el);
             } catch (error) {
-              console.warn(`Error measuring character "${char}":`, error.message);
             }
           }
-          
           return results;
         }, batch, Object.fromEntries(CHARACTER_MAP));
         
@@ -214,13 +192,9 @@ async function measureCharactersInBatches(page, font, characters) {
         
       } catch (error) {
         retries++;
-        console.warn(`  ⚠️ Batch ${batchIndex + 1} attempt ${retries} failed:`, error.message);
-        
         if (retries >= CONFIG.MAX_RETRIES) {
-          console.error(`  ❌ Batch ${batchIndex + 1} failed after ${CONFIG.MAX_RETRIES} attempts`);
           break;
         }
-        
         await new Promise(resolve => setTimeout(resolve, 1000 * retries));
       }
     }
@@ -231,41 +205,62 @@ async function measureCharactersInBatches(page, font, characters) {
 
 async function processFont(page, key, font) {
   try {
-    console.log(`📐 Measuring characters for "${key}"`);
-    console.log(`  🔗 Font URL: ${font.importUrl}`);
-    console.log(`  📝 CSS Family: ${font.cssFamily}`);
-
-    const startTime = Date.now();
     const charMetrics = await measureCharactersInBatches(page, font, CHARACTERS_ARRAY);
-    const endTime = Date.now();
-
     const measuredCount = Object.keys(charMetrics).length;
-    console.log(`  ✅ Measured ${measuredCount}/${CHARACTER_MAP.size} characters in ${endTime - startTime}ms`);
-
     font.characters = charMetrics;
-
+    font.characterCount = measuredCount;
+    font.lastMeasured = new Date().toISOString();
+    delete font.scale;
+    const filepath = writeFontFile(key, font);
     return true;
   } catch (error) {
-    console.error(`  ❌ Failed to measure "${key}": ${error.message}`);
+    font.measurementError = error.message;
+    font.lastMeasured = new Date().toISOString();
+    font.characters = {};
+    font.characterCount = 0;
+    try {
+      const filepath = writeFontFile(key, font);
+    } catch (writeError) {
+    }
     return false;
   }
 }
 
-function writeOutputSafely(fonts) {
-  const outputData = JSON.stringify(fonts, null, 2);
+function ensureOutputDirectory() {
+  if (!fs.existsSync(CONFIG.OUTPUT_DIR)) {
+    fs.mkdirSync(CONFIG.OUTPUT_DIR, { recursive: true });
+  }
+}
+
+function getSafeFilename(fontKey) {
+  const safeName = fontKey
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  
+  return `${safeName}.json`;
+}
+
+function writeFontFile(fontKey, fontData) {
+  const filename = getSafeFilename(fontKey);
+  const filepath = path.join(CONFIG.OUTPUT_DIR, filename);
   
   try {
-    if (fs.existsSync(CONFIG.OUTPUT_FILE)) {
-      const backupFile = CONFIG.OUTPUT_FILE.replace('.json', '.backup.json');
-      fs.copyFileSync(CONFIG.OUTPUT_FILE, backupFile);
-      console.log(`📋 Created backup: ${backupFile}`);
+    if (fs.existsSync(filepath)) {
+      const backupPath = filepath.replace('.json', '.backup.json');
+      fs.copyFileSync(filepath, backupPath);
     }
-    
-    fs.writeFileSync(CONFIG.OUTPUT_FILE, outputData, 'utf-8');
-    console.log(`💾 Output written to: ${CONFIG.OUTPUT_FILE}`);
-    
+    const outputData = {
+      name: fontKey,
+      importUrl: fontData.importUrl,
+      cssFamily: fontData.cssFamily,
+      characters: fontData.characters || {}
+    };
+    fs.writeFileSync(filepath, JSON.stringify(outputData, null, 2), 'utf-8');
+    return filepath;
   } catch (error) {
-    throw new Error(`Failed to write output file: ${error.message}`);
+    throw new Error(`Failed to write font file ${filename}: ${error.message}`);
   }
 }
 
@@ -273,12 +268,9 @@ function writeOutputSafely(fonts) {
   let browser = null;
   
   try {
-    console.log('🚀 Starting font character measurement...');
-    
     const fonts = validateInput();
     const fontEntries = Object.entries(fonts);
-    console.log(`📚 Found ${fontEntries.length} fonts to process`);
-    
+    ensureOutputDirectory();
     browser = await puppeteer.launch({ 
       headless: 'new',
       args: [
@@ -293,43 +285,43 @@ function writeOutputSafely(fonts) {
     });
     
     const page = await browser.newPage();
-    
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-    
     page.setDefaultTimeout(CONFIG.PAGE_TIMEOUT);
     
     let successCount = 0;
     let failureCount = 0;
+    const processedFiles = [];
     
     for (let i = 0; i < fontEntries.length; i++) {
       const [key, font] = fontEntries[i];
-      
-      console.log(`\n[${i + 1}/${fontEntries.length}] Processing font: ${key}`);
-      
       const success = await processFont(page, key, font);
       if (success) {
         successCount++;
+        processedFiles.push(getSafeFilename(key));
       } else {
         failureCount++;
       }
-      
       await page.goto('about:blank');
     }
     
-    writeOutputSafely(fonts);
+    const indexData = {
+      timestamp: new Date().toISOString(),
+      totalFonts: fontEntries.length,
+      successCount,
+      failureCount,
+      outputDirectory: CONFIG.OUTPUT_DIR,
+      files: processedFiles.sort()
+    };
     
-    console.log('\n✅ Font character measurement complete!');
-    console.log(`📊 Results: ${successCount} successful, ${failureCount} failed`);
+    const indexPath = path.join(CONFIG.OUTPUT_DIR, 'index.json');
+    fs.writeFileSync(indexPath, JSON.stringify(indexData, null, 2));
     
   } catch (error) {
-    console.error('\n❌ Fatal error:', error.message);
     process.exit(1);
-    
   } finally {
     if (browser) {
       await browser.close();
-      console.log('🔒 Browser closed');
     }
   }
 })();
