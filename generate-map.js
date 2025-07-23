@@ -45,9 +45,7 @@ async function generateFontLibrary() {
     }
 
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(fonts, null, 2));
-    console.log('✅ Font library updated.');
   } catch (err) {
-    console.error('❌ Error generating font library:', err);
     process.exit(1);
   }
 }
