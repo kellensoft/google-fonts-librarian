@@ -252,7 +252,7 @@ function writeFontFile(fontKey, fontData) {
       fs.copyFileSync(filepath, backupPath);
     }
     const outputData = {
-      name: fontKey,
+      name: fontData.name,
       importUrl: fontData.importUrl,
       cssFamily: fontData.cssFamily,
       characters: fontData.characters || {}
