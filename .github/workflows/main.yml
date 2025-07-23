@@ -24,21 +24,12 @@ jobs:
         env:
           GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY }}
 
-      - run: node measure-fonts.js
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
-      - name: Zip google-fonts directory
-        run: zip -r google-fonts.zip google-fonts
-
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="google-fonts-${{ steps.date.outputs.date }}"
-          gh release create "$tag" google-fonts.zip \
+          gh release create "$tag" google-fonts.json \
             --title "Google Fonts Library - ${{ steps.date.outputs.date }}" \
             --notes "Automated release of google-fonts.zip on ${{ steps.date.outputs.date }}" \
             --repo ${{ github.repository }}
